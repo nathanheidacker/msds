@@ -1,5 +1,7 @@
+use kdam::tqdm;
 use pyo3::prelude::*;
 use rand::Rng;
+mod test;
 
 const RATES: &'static [(f64, f64, f64)] = &[
     (0.95, 0.05, 0.0),
@@ -104,16 +106,78 @@ fn starforce_single(start: usize, end: usize, lvl: usize) -> PyResult<(i64, i64,
     Ok((cost, tap_count, boom_count))
 }
 
-/// Formats the sum of two numbers as string.
-#[pyfunction]
-fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
-    Ok((a + b).to_string())
+fn starforce_single_rust(start: usize, end: usize, costs: &Vec<i64>) -> (i64, i64, i64) {
+    let mut current: usize = start as usize;
+    let mut roll: f64;
+    let mut tap_count: i64 = 0;
+    let mut boom_count: i64 = 0;
+    let mut cost: i64 = 0;
+    let mut consecutive_fails: i8 = 0;
+    let mut rng = rand::thread_rng();
+
+    while current != end {
+        let (succeed, fail, _boom) = RATES[current];
+        tap_count += 1;
+
+        cost += costs[current];
+        roll = if consecutive_fails == 2 {
+            0.0
+        } else {
+            rng.gen::<f64>()
+        };
+
+        // Success
+        if roll <= succeed {
+            current += 1;
+            consecutive_fails += 1;
+        }
+        // Failure
+        else if roll <= succeed + fail {
+            if !INVALID.contains(&current) {
+                current -= 1;
+                consecutive_fails += 1;
+            }
+        }
+        // Boom
+        else {
+            boom_count += 1;
+            current = 12;
+            consecutive_fails = 0;
+        }
+    }
+    (cost, tap_count, boom_count)
 }
 
-/// A Python module implemented in Rust.
+#[pyfunction]
+fn starforce(
+    start: usize,
+    end: usize,
+    lvl: usize,
+    n: usize,
+    progress: bool,
+) -> PyResult<Vec<(i64, i64, i64)>> {
+    let costs = get_costs(lvl);
+    let result: Vec<(i64, i64, i64)> = tqdm!(0..n, total = n, disable = !progress)
+        .map(|_| -> (i64, i64, i64) { starforce_single_rust(start, end, &costs) })
+        .collect();
+    Ok(result)
+}
+
+#[pyfunction]
+fn starforce_benchmark(start: usize, end: usize, lvl: usize, n: usize) -> PyResult<()> {
+    let costs = get_costs(lvl);
+    for _ in 0..n {
+        starforce_single_rust(start, end, &costs);
+    }
+    Ok(())
+}
+
+/// A python datascience toolkit for MapleStory
 #[pymodule]
-fn msds(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
+fn rust(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(starforce, m)?)?;
     m.add_function(wrap_pyfunction!(starforce_single, m)?)?;
+    m.add_function(wrap_pyfunction!(starforce_benchmark, m)?)?;
+    m.add_function(wrap_pyfunction!(test::test, m)?)?;
     Ok(())
 }
