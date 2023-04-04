@@ -98,6 +98,23 @@ class StarforceResult:
 def starforce(
     start: int, end: int, lvl: int, n: int = 100_000, progress: bool = True
 ) -> StarforceResult:
+    """
+    Performs starforce random walk n times
+
+    Given a start, end, level, and number of iterations to perform, performs a
+    Starforce random walk to completion for n iterations and returns the result
+    as a StarforceResult, which allows for probability testing
+
+    Args:
+        start: Starting starforce level
+        end: Desired end starforce level
+        lvl: item level (??? not sure not a maplestory player)
+        n: Number of iterations to perform
+        progress: Whether or not to display a progress bar. Defaults to True
+
+    Returns:
+        StarforceResult
+    """
     if not end > start:
         raise ValueError(
             f"End value must be greater than the starting value, received {start=}, {end=}"
