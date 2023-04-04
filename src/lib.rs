@@ -5,6 +5,7 @@ mod starforce_functions;
 #[pymodule]
 fn rust(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(starforce_functions::_starforce, m)?)?;
+    m.add_function(wrap_pyfunction!(starforce_functions::_starforce_mt, m)?)?;
     m.add_function(wrap_pyfunction!(starforce_functions::_starforce_single, m)?)?;
     m.add_function(wrap_pyfunction!(
         starforce_functions::_starforce_benchmark,

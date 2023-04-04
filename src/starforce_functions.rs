@@ -1,6 +1,7 @@
 use kdam::tqdm;
 use pyo3::prelude::*;
 use rand::Rng;
+use std::thread;
 
 const RATES: &'static [(f64, f64, f64)] = &[
     (0.95, 0.05, 0.0),
@@ -160,6 +161,56 @@ pub fn _starforce(
         .map(|_| -> (i64, i64, i64) { starforce_single_rust(start, end, &costs) })
         .collect();
     Ok(result)
+}
+
+fn _starforce_mt_single(
+    start: usize,
+    end: usize,
+    lvl: usize,
+    n: usize,
+    progress: bool,
+    position: u16,
+) -> PyResult<Vec<(i64, i64, i64)>> {
+    let costs = get_costs(lvl);
+    let result: Vec<(i64, i64, i64)> =
+        tqdm!(0..n, total = n, disable = !progress, position = position)
+            .map(|_| -> (i64, i64, i64) { starforce_single_rust(start, end, &costs) })
+            .collect();
+    Ok(result)
+}
+
+#[pyfunction]
+pub fn _starforce_mt(
+    start: usize,
+    end: usize,
+    lvl: usize,
+    n: usize,
+    progress: bool,
+) -> PyResult<Vec<(i64, i64, i64)>> {
+    let cores: usize = thread::available_parallelism()?.get();
+    let mut handles = vec![];
+    let mut results: Vec<(i64, i64, i64)> = vec![];
+    for i in 0..cores {
+        let handle = thread::spawn(move || {
+            _starforce_mt_single(
+                start.clone(),
+                end.clone(),
+                lvl.clone(),
+                n.clone(),
+                progress.clone(),
+                i as u16,
+            )
+        });
+        handles.push(handle)
+    }
+    for handle in handles {
+        let mut result = handle.join().unwrap().unwrap();
+        results.append(&mut result);
+    }
+    if progress {
+        println!("{}", String::from("\n").repeat(cores - 1))
+    }
+    Ok(results)
 }
 
 #[pyfunction]
