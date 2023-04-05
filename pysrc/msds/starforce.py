@@ -1,7 +1,8 @@
-from msds.rust import _starforce
+from msds.rust import _starforce, _starforce_mt
 from typing import Iterable, Literal
 import numpy as np
 from enum import Enum
+import matplotlib.pyplot as plt
 
 
 class StarforceResult:
@@ -25,10 +26,19 @@ class StarforceResult:
         self.booms = np.array(self.booms)
 
     def __str__(self) -> str:
-        return f"<Starforce Result | {self.start} -> {self.end} | lvl{self.lvl} | n={self.size}>"
+        return f"<Starforce Result | {self.start} -> {self.end} | lvl{self.lvl} | n={self.size:,}>"
 
     def __repr__(self) -> str:
         return str(self)
+
+    def get_metric(self, metric: Literal["costs", "taps", "booms"]) -> np.ndarray:
+        match metric:
+            case "costs":
+                return self.costs
+            case "taps":
+                return self.taps
+            case "booms":
+                return self.booms
 
     def plt(
         self, comparand: float, metric: Literal["costs", "taps", "booms"] = "costs"
@@ -52,15 +62,7 @@ class StarforceResult:
         Returns:
             The probability
         """
-        match metric:
-            case "costs":
-                nums = self.costs
-            case "taps":
-                nums = self.taps
-            case "booms":
-                nums = self.booms
-
-        return (nums < comparand).mean()
+        return (self.get_metric(metric) < comparand).mean()
 
     def pgt(
         self, comparand: float, metric: Literal["costs", "taps", "booms"] = "costs"
@@ -84,19 +86,31 @@ class StarforceResult:
         Returns:
             The probability
         """
-        match metric:
-            case "costs":
-                nums = self.costs
-            case "taps":
-                nums = self.taps
-            case "booms":
-                nums = self.booms
+        return (self.get_metric(metric) > comparand).mean()
 
-        return (nums > comparand).mean()
+    def histogram(
+        self,
+        metric: Literal["costs", "taps", "booms"],
+        bins: int = 1000,
+    ) -> None:
+        """Displays a histogram of the input metric"""
+        nums = self.get_metric(metric)
+        metric_max = nums.max()
+        metric_min = nums.min()
+        metric_range = metric_max - metric_min
+        if bins > metric_range:
+            bins = int(metric_range)
+        plt.hist(nums, bins=bins)
+        plt.show()
 
 
 def starforce(
-    start: int, end: int, lvl: int, n: int = 100_000, progress: bool = True
+    start: int,
+    end: int,
+    lvl: int,
+    n: int = 100_000,
+    multithreaded: bool = True,
+    progress: bool = True,
 ) -> StarforceResult:
     """
     Performs starforce random walk n times
@@ -123,5 +137,6 @@ def starforce(
     if not 0 <= lvl <= 200:
         raise ValueError(f"lvl must be in the domain {{0, 200}}, received {lvl=}")
 
-    results = _starforce(start, end, lvl, n, progress)
+    sf = _starforce_mt if multithreaded else _starforce
+    results = sf(start, end, lvl, n, progress)
     return StarforceResult(start, end, lvl, results)
