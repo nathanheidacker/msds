@@ -190,13 +190,22 @@ pub fn _starforce_mt(
     let cores: usize = thread::available_parallelism()?.get();
     let mut handles = vec![];
     let mut results: Vec<(i64, i64, i64)> = vec![];
+    let div = n / cores;
+    let n_mod = n % cores;
+    let mut ns: Vec<usize> = (0..cores).map(|_| div).collect();
+    if n_mod > 0 {
+        for i in 0..n_mod {
+            ns[i] += 1;
+        }
+    }
     for i in 0..cores {
+        let subn = ns[i].clone();
         let handle = thread::spawn(move || {
             _starforce_mt_single(
                 start.clone(),
                 end.clone(),
                 lvl.clone(),
-                n.clone(),
+                subn,
                 progress.clone(),
                 i as u16,
             )
