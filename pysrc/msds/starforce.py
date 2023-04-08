@@ -5,6 +5,7 @@ import numpy as np
 from enum import Enum
 import matplotlib.pyplot as plt
 from pathlib import Path
+from scipy.optimize import curve_fit
 
 
 class StarforceResult:
@@ -37,7 +38,7 @@ class StarforceResult:
     def save(
         self, name: str, dir: Optional[str | Path] = None, overwrite: bool = True
     ) -> bool:
-        """Saves a StarforceResult so that it may be instantiated quickly"""
+        """Saves a StarforceResult to disk"""
         ...
 
     def load(self, name: str, dir: Optional[str | Path] = None) -> StarforceResult:
@@ -77,26 +78,6 @@ class StarforceResult:
         nums = self.get_metric(metric)
         idx = min(int(self.size * percentile), self.size - 1)
         return nums[idx]
-
-    def get_percentile(
-        self, value: float, metric: Literal["costs", "taps", "booms"]
-    ) -> float:
-        """
-        Returns the percentile of a given value for a given metric
-
-        Given some value, returns the percentile of that value within the input
-        metric
-
-        Args:
-            value: The value to find the percentile of
-            metric: The metric to search within
-
-        Returns:
-            The percentile, a value ranging between 0 and 1
-        """
-        self.order()
-        nums = self.get_metric(metric)
-        return 0
 
     def get_metric(self, metric: Literal["costs", "taps", "booms"]) -> np.ndarray:
         match metric:
@@ -188,7 +169,7 @@ class StarforceResult:
             booms_padding = " " * (max_booms - len(booms))
             booms = f"booms: {booms}{booms_padding}"
 
-            overview += f"{percentile}| {costs}| {taps}| {booms}\n"
+            overview += f"{percentile}| {costs} | {taps}| {booms}\n"
 
         return overview
 
@@ -207,6 +188,38 @@ class StarforceResult:
         plt.hist(nums, bins=bins)
         plt.show()
 
+    def fit_exponential(self, n_bins: int = 100) -> dict[str, tuple[float, float]]:
+        """
+        Fits result to exponential distribution
+
+        Fits each of costs, taps, and booms within this result to an exponential
+        distribution, and returns the values which parameterize the exponential
+        for each of the 3 sets of values
+        
+        Args:
+            n_bins: The number of bins to use when fitting
+
+        Returns:
+            A dictionary of parameters for exponential functions
+        """
+        result = {}
+        to_fit = ["costs", "taps", "booms"]
+
+        exponential = lambda x, a, b, c: a * np.exp(-x * b) + c
+
+        for data in to_fit:
+            counts, bins = np.histogram(getattr(self, data), n_bins)
+            bins = ((bins + np.roll(bins, 1)) / 2)[1:]
+
+            counts = counts.astype(np.float64)
+            bins = bins.astype(np.float64)
+
+            x = 0
+
+            result[data] = "hehexd"
+
+        return result
+
 
 def starforce(
     start: int,
@@ -221,7 +234,7 @@ def starforce(
 
     Given a start, end, level, and number of iterations to perform, performs a
     Starforce random walk to completion for n iterations and returns the result
-    as a StarforceResult, which allows for probability testing
+    as a StarforceResult
 
     Args:
         start: Starting starforce level
